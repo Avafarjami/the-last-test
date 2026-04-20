@@ -8,24 +8,29 @@
     <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <style>
-      /* ظاهر بخش تایپ متن */
       #ui-layer {
         position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-        z-index: 1000; display: none; background: rgba(0,0,0,0.8);
+        z-index: 9999; display: none; background: rgba(0,0,0,0.8);
         padding: 10px; border-radius: 10px; width: 80%; text-align: center;
       }
-      input { padding: 10px; width: 60%; border-radius: 5px; border: none; outline: none; }
-      button { padding: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+      input { padding: 10px; width: 60%; border-radius: 5px; border: none; }
+      button { padding: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; }
     </style>
   </head>
+  
   <body>
-
     <div id="ui-layer">
-      <input type="text" id="userMsg" placeholder="Share a memory...">
+      <input type="text" id="userMsg" placeholder="Memory...">
       <button id="sendBtn">Add</button>
     </div>
 
-    <a-scene mindar-image="imageTargetSrc: ./assets/targets.mind" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+    <a-scene 
+      mindar-image="imageTargetSrc: ./assets/targets.mind; autoStart: true; uiLoading: yes; uiScanning: yes;" 
+      color-space="sRGB" 
+      renderer="colorManagement: true, physicallyCorrectLights" 
+      vr-mode-ui="enabled: false" 
+      device-orientation-permission-ui="enabled: false">
+      
       <a-assets>
         <img id="panir" src="./assets/52.png" />
       </a-assets>
@@ -33,14 +38,13 @@
       <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
       <a-entity id="main-anchor" mindar-image-target="targetIndex: 0">
-        <a-plane src="#panir" position="0 0 0" height="0.552" width="1" rotation="0 0 0" transparent="true"></a-plane>
-        
+        <a-plane src="#panir" position="0 0 0" height="0.552" width="1" transparent="true"></a-plane>
         <a-entity id="memory-container"></a-entity>
       </a-entity>
     </a-scene>
 
     <script>
-      // کانفیگ فایربیس تو
+      // تنظیمات فایربیس
       const firebaseConfig = {
         apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
         authDomain: "hidden-memories-27f1a.firebaseapp.com",
@@ -60,11 +64,15 @@
       const uiLayer = document.querySelector('#ui-layer');
       let count = 0;
 
-      // نمایش کیبورد و اینپوت فقط وقتی تصویر اسکن شد
-      anchor.addEventListener("targetFound", () => { uiLayer.style.display = "block"; });
-      anchor.addEventListener("targetLost", () => { uiLayer.style.display = "none"; });
+      // شنونده‌های رویداد برای نمایش UI
+      anchor.addEventListener("targetFound", () => { 
+        uiLayer.style.display = "block"; 
+      });
+      anchor.addEventListener("targetLost", () => { 
+        uiLayer.style.display = "none"; 
+      });
 
-      // فرستادن متن به فایربیس
+      // ارسال متن
       document.querySelector('#sendBtn').addEventListener('click', () => {
         const input = document.querySelector('#userMsg');
         if (input.value.trim()) {
@@ -73,15 +81,14 @@
         }
       });
 
-      // گرفتن متن‌ها از فایربیس و نمایش در AR
+      // نمایش زنده متن‌ها
       memoriesRef.on('child_added', (snapshot) => {
         const data = snapshot.val();
         const textEl = document.createElement('a-text');
         textEl.setAttribute('value', data.text);
-        // متن‌ها را با فاصله عمودی از هم بالای تصویر پنیر می‌چینیم
-        textEl.setAttribute('position', `0 ${0.4 + (count * 0.15)} 0.01`);
+        textEl.setAttribute('position', `0 ${0.5 + (count * 0.2)} 0.1`);
         textEl.setAttribute('align', 'center');
-        textEl.setAttribute('width', '2');
+        textEl.setAttribute('width', '3');
         textEl.setAttribute('color', '#FFFFFF');
         container.appendChild(textEl);
         count++;
