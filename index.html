@@ -2,19 +2,18 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta charset="utf-8">
     <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/hiukim/mind-ar-js@1.1.4/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
         #ui-layer {
             position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-            z-index: 1000; display: none; background: rgba(0,0,0,0.85);
-            padding: 15px; border-radius: 15px; width: 80%; text-align: center;
+            z-index: 9999; display: none; background: rgba(0,0,0,0.8);
+            padding: 15px; border-radius: 12px; width: 80%; text-align: center;
         }
-        input { padding: 12px; width: 60%; border-radius: 8px; border: none; }
-        button { padding: 12px; background: #007bff; color: white; border: none; border-radius: 8px; font-weight: bold; }
+        input { padding: 10px; width: 60%; border-radius: 5px; border: none; }
+        button { padding: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
@@ -25,19 +24,19 @@
     </div>
 
     <a-scene 
-        mindar-image="imageTargetSrc: ./targets.mind; filterMinCF:0.001; filterBeta: 0.01;" 
-        embedded 
-        vr-mode-ui="enabled: false" 
+        mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiLoading: yes; uiScanning: yes;" 
+        embedded vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: false">
         
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
         <a-entity id="memory-anchor" mindar-image-target="targetIndex: 0">
-            </a-entity>
+            <a-box color="red" position="0 0 0" scale="0.1 0.1 0.1"></a-box>
+        </a-entity>
     </a-scene>
 
-    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-database-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
     <script>
         const firebaseConfig = {
@@ -50,6 +49,7 @@
             appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
         };
 
+        // شروع به کار فایربیس
         firebase.initializeApp(firebaseConfig);
         const db = firebase.database();
         const memoriesRef = db.ref('memories');
@@ -58,17 +58,20 @@
         const uiLayer = document.querySelector('#ui-layer');
         let count = 0;
 
+        // مدیریت نمایش UI
         anchor.addEventListener("targetFound", () => { uiLayer.style.display = "block"; });
         anchor.addEventListener("targetLost", () => { uiLayer.style.display = "none"; });
 
+        // ارسال متن
         document.querySelector('#sendBtn').addEventListener('click', () => {
             const input = document.querySelector('#userMsg');
             if (input.value.trim()) {
-                memoriesRef.push({ text: input.value.trim(), time: Date.now() });
+                memoriesRef.push({ text: input.value, time: Date.now() });
                 input.value = "";
             }
         });
 
+        // خواندن و نمایش
         memoriesRef.on('child_added', (snapshot) => {
             const data = snapshot.val();
             const textEl = document.createElement('a-text');
@@ -76,7 +79,7 @@
             textEl.setAttribute('position', `0 ${0.5 - (count * 0.2)} 0.1`);
             textEl.setAttribute('align', 'center');
             textEl.setAttribute('width', '2.5');
-            textEl.setAttribute('color', '#ffffff');
+            textEl.setAttribute('color', '#FFFFFF');
             anchor.appendChild(textEl);
             count++;
         });
