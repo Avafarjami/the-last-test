@@ -2,83 +2,81 @@
 <html>
 <head>
     <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta charset="utf-8">
-    <title>Hidden Memories - Interactive AR</title>
-    
-    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
-
-    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-database-compat.js"></script>
+    <script src="https://aframe.io/releases/1.4.1/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.1/dist/mindar-image-aframe.prod.js"></script>
 
     <style>
         body { margin: 0; overflow: hidden; }
-        
-        /* UI Layer for Text Input */
         #ui-layer {
-            position: fixed;
-            bottom: 20px;
-            left: 50%;
-            transform: translateX(-50%);
-            z-index: 1000;
-            display: none; /* Only show when target is found */
-            background: rgba(0, 0, 0, 0.8);
-            padding: 15px;
-            border-radius: 15px;
-            width: 85%;
-            max-width: 400px;
-            text-align: center;
-            border: 1px solid #444;
+            position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+            z-index: 1000; display: none; background: rgba(0,0,0,0.8);
+            padding: 15px; border-radius: 12px; width: 80%; text-align: center;
         }
-
-        input {
-            width: 65%;
-            padding: 12px;
-            border: none;
-            border-radius: 8px;
-            outline: none;
-            font-size: 16px;
-        }
-
-        button {
-            width: 25%;
-            padding: 12px;
-            background: #2196F3;
-            color: white;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-            font-weight: bold;
-            margin-left: 5px;
-        }
-
-        /* Loading UI */
-        #scanning-overlay {
-            position: fixed;
-            top: 0; left: 0; right: 0; bottom: 0;
-            background: rgba(0,0,0,0.5);
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            color: white;
-            z-index: 999;
-            pointer-events: none;
-        }
+        input { padding: 10px; width: 60%; border-radius: 5px; border: none; }
+        button { padding: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; }
     </style>
 </head>
 <body>
 
     <div id="ui-layer">
-        <input type="text" id="userMsg" placeholder="Write a memory...">
+        <input type="text" id="userMsg" placeholder="Memory...">
         <button id="sendBtn">Add</button>
     </div>
 
     <a-scene 
-        mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiLoading: no; uiScanning: yes;" 
-        embedded 
-        color-space="sRGB" 
-        renderer="colorManagement: true, physicallyCorrectLights" 
-        vr-mode-ui="enabled: false" 
+        mindar-image="imageTargetSrc: ./targets.mind; autoStart: true;" 
+        embedded vr-mode-ui="enabled: false" 
         device-orientation-permission-ui="enabled: false">
         
         <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <a-entity id="memory-anchor" mindar-image-target="targetIndex: 0">
+            </a-entity>
+    </a-scene>
+
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/9.1.1/firebase-database-compat.js"></script>
+
+    <script>
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
+            authDomain: "hidden-memories-27f1a.firebaseapp.com",
+            projectId: "hidden-memories-27f1a",
+            databaseURL: "https://hidden-memories-27f1a-default-rtdb.europe-west1.firebasedatabase.app/",
+            storageBucket: "hidden-memories-27f1a.firebasestorage.app",
+            messagingSenderId: "61920134607",
+            appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
+        };
+
+        firebase.initializeApp(firebaseConfig);
+        const db = firebase.database();
+        const memoriesRef = db.ref('memories');
+
+        const anchor = document.querySelector('#memory-anchor');
+        const uiLayer = document.querySelector('#ui-layer');
+        let count = 0;
+
+        anchor.addEventListener("targetFound", () => { uiLayer.style.display = "block"; });
+        anchor.addEventListener("targetLost", () => { uiLayer.style.display = "none"; });
+
+        document.querySelector('#sendBtn').addEventListener('click', () => {
+            const input = document.querySelector('#userMsg');
+            if (input.value.trim()) {
+                memoriesRef.push({ text: input.value, time: Date.now() });
+                input.value = "";
+            }
+        });
+
+        memoriesRef.on('child_added', (snapshot) => {
+            const data = snapshot.val();
+            const textEl = document.createElement('a-text');
+            textEl.setAttribute('value', data.text);
+            textEl.setAttribute('position', `0 ${0.6 - (count * 0.2)} 0.1`);
+            textEl.setAttribute('align', 'center');
+            textEl.setAttribute('width', '3');
+            anchor.appendChild(textEl);
+            count++;
+        });
+    </script>
+</body>
+</html>
