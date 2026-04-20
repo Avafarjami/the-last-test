@@ -1,98 +1,190 @@
-<html>
-  <head>
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
-    
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width,initial-scale=1,user-scalable=no">
+    <title>Hidden Memories XR - Fixed</title>
     <style>
-      #ui-layer {
-        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
-        z-index: 9999; display: none; background: rgba(0,0,0,0.8);
-        padding: 10px; border-radius: 10px; width: 80%; text-align: center;
-      }
-      input { padding: 10px; width: 60%; border-radius: 5px; border: none; }
-      button { padding: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; }
+        html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; }
+        #landing { position: fixed; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; background: #07090f; z-index: 100; color: white; }
+        button { padding: 15px 30px; border: 0; border-radius: 12px; background: #00d4ff; color: #000; font-weight: 700; cursor: pointer; }
+        #ui-container { position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%); z-index: 1000; display: none; width: 90%; }
+        #composer { display: flex; gap: 10px; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 50px; }
+        input { flex: 1; border: 0; outline: none; padding: 10px 15px; border-radius: 999px; font-size: 16px; }
+        #status { position: fixed; top: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.5); color: #fff; padding: 5px 15px; border-radius: 20px; font-size: 12px; z-index: 1000; pointer-events: none; }
+        canvas { display: block !important; }
     </style>
-  </head>
-  
-  <body>
-    <div id="ui-layer">
-      <input type="text" id="userMsg" placeholder="Memory...">
-      <button id="sendBtn">Add</button>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore-compat.js"></script>
+</head>
+<body>
+
+<div id="landing">
+    <h1>Hidden Memories</h1>
+    <button id="enter">START AR</button>
+</div>
+
+<div id="status">Ready</div>
+
+<div id="ui-container">
+    <div id="composer">
+        <input id="msg" maxlength="30" placeholder="Type a memory...">
+        <button id="send">SEND</button>
     </div>
+</div>
 
-    <a-scene 
-      mindar-image="imageTargetSrc: ./assets/targets.mind; autoStart: true; uiLoading: yes; uiScanning: yes;" 
-      color-space="sRGB" 
-      renderer="colorManagement: true, physicallyCorrectLights" 
-      vr-mode-ui="enabled: false" 
-      device-orientation-permission-ui="enabled: false">
-      
-      <a-assets>
-        <img id="panir" src="./assets/52.png" />
-      </a-assets>
+<script>
+// --- Firebase Config ---
+const firebaseConfig = {
+    apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
+    authDomain: "hidden-memories-27f1a.firebaseapp.com",
+    projectId: "hidden-memories-27f1a",
+    storageBucket: "hidden-memories-27f1a.firebasestorage.app",
+    messagingSenderId: "61920134607",
+    appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
+};
+firebase.initializeApp(firebaseConfig);
+const db = firebase.firestore();
 
-      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+// --- AR & Three.js Variables ---
+let scene, camera, renderer, session, reticle, hitTestSource, refSpace, viewerSpace;
+let anchor = new THREE.Group();
+let placed = false;
 
-      <a-entity id="main-anchor" mindar-image-target="targetIndex: 0">
-        <a-plane src="#panir" position="0 0 0" height="0.552" width="1" transparent="true"></a-plane>
-        <a-entity id="memory-container"></a-entity>
-      </a-entity>
-    </a-scene>
+const statusEl = document.getElementById('status');
 
-    <script>
-      // تنظیمات فایربیس
-      const firebaseConfig = {
-        apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
-        authDomain: "hidden-memories-27f1a.firebaseapp.com",
-        projectId: "hidden-memories-27f1a",
-        databaseURL: "https://hidden-memories-27f1a-default-rtdb.europe-west1.firebasedatabase.app/",
-        storageBucket: "hidden-memories-27f1a.firebasestorage.app",
-        messagingSenderId: "61920134607",
-        appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
-      };
+async function startAR() {
+    try {
+        if (!navigator.xr) throw new Error("WebXR not supported");
 
-      firebase.initializeApp(firebaseConfig);
-      const db = firebase.database();
-      const memoriesRef = db.ref('memories');
-
-      const anchor = document.querySelector('#main-anchor');
-      const container = document.querySelector('#memory-container');
-      const uiLayer = document.querySelector('#ui-layer');
-      let count = 0;
-
-      // شنونده‌های رویداد برای نمایش UI
-      anchor.addEventListener("targetFound", () => { 
-        uiLayer.style.display = "block"; 
-      });
-      anchor.addEventListener("targetLost", () => { 
-        uiLayer.style.display = "none"; 
-      });
-
-      // ارسال متن
-      document.querySelector('#sendBtn').addEventListener('click', () => {
-        const input = document.querySelector('#userMsg');
-        if (input.value.trim()) {
-          memoriesRef.push({ text: input.value, timestamp: Date.now() });
-          input.value = "";
+        // درخواست اجازه سنسور برای iOS
+        if (typeof DeviceOrientationEvent !== 'undefined' && typeof DeviceOrientationEvent.requestPermission === 'function') {
+            await DeviceOrientationEvent.requestPermission();
         }
-      });
 
-      // نمایش زنده متن‌ها
-      memoriesRef.on('child_added', (snapshot) => {
-        const data = snapshot.val();
-        const textEl = document.createElement('a-text');
-        textEl.setAttribute('value', data.text);
-        textEl.setAttribute('position', `0 ${0.5 + (count * 0.2)} 0.1`);
-        textEl.setAttribute('align', 'center');
-        textEl.setAttribute('width', '3');
-        textEl.setAttribute('color', '#FFFFFF');
-        container.appendChild(textEl);
-        count++;
-      });
-    </script>
-  </body>
+        // Setup Three.js
+        scene = new THREE.Scene();
+        camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
+        renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.setPixelRatio(window.devicePixelRatio);
+        renderer.xr.enabled = true;
+        document.body.appendChild(renderer.domElement);
+
+        scene.add(new THREE.AmbientLight(0xffffff, 2));
+        scene.add(anchor);
+
+        // Reticle (نشانگر روی زمین)
+        reticle = new THREE.Mesh(
+            new THREE.RingGeometry(0.07, 0.1, 32).rotateX(-Math.PI / 2),
+            new THREE.MeshBasicMaterial({ color: 0x00d4ff })
+        );
+        reticle.visible = false;
+        scene.add(reticle);
+
+        // شروع سشن AR
+        session = await navigator.xr.requestSession('immersive-ar', {
+            requiredFeatures: ['hit-test', 'local-floor']
+        });
+        renderer.xr.setSession(session);
+
+        refSpace = await session.requestReferenceSpace('local-floor');
+        viewerSpace = await session.requestReferenceSpace('viewer');
+        hitTestSource = await session.requestHitTestSource({ space: viewerSpace });
+
+        document.getElementById('landing').style.display = 'none';
+        statusEl.textContent = "Point at floor and tap";
+
+        // رویداد کلیک برای کاشتن مربع
+        session.addEventListener('select', placeZone);
+
+        renderer.setAnimationLoop(render);
+        loadMessages();
+
+    } catch (e) {
+        alert(e.message);
+    }
+}
+
+function render(timestamp, frame) {
+    if (frame && hitTestSource && !placed) {
+        const hits = frame.getHitTestResults(hitTestSource);
+        if (hits.length > 0) {
+            const pose = hits[0].getPose(refSpace);
+            reticle.visible = true;
+            reticle.position.set(pose.transform.position.x, pose.transform.position.y, pose.transform.position.z);
+        } else {
+            reticle.visible = false;
+        }
+    }
+    renderer.render(scene, camera);
+}
+
+function placeZone() {
+    if (placed || !reticle.visible) return;
+    placed = true;
+    
+    // انتقال انکر به جای نشانگر
+    anchor.position.copy(reticle.position);
+    reticle.visible = false;
+
+    // نمایش فرش آبی ۱ در ۱ متر
+    const ground = new THREE.Mesh(
+        new THREE.PlaneGeometry(1, 1).rotateX(-Math.PI / 2),
+        new THREE.MeshBasicMaterial({ color: 0x00d4ff, transparent: true, opacity: 0.2 })
+    );
+    anchor.add(ground);
+
+    document.getElementById('ui-container').style.display = 'block';
+    statusEl.textContent = "Square Locked 1x1m";
+}
+
+function loadMessages() {
+    db.collection('messages').orderBy('createdAt', 'desc').limit(15).onSnapshot(snap => {
+        // حذف پیام‌های قدیمی (بجز فرش آبی که عضو اول است)
+        while (anchor.children.length > 1) { anchor.remove(anchor.children[1]); }
+
+        snap.forEach(doc => {
+            const data = doc.data();
+            if (!data.text) return;
+
+            const canvas = document.createElement('canvas');
+            canvas.width = 512; canvas.height = 128;
+            const ctx = canvas.getContext('2d');
+            ctx.fillStyle = 'white';
+            ctx.font = 'bold 40px Arial';
+            ctx.textAlign = 'center';
+            ctx.fillText(data.text, 256, 70);
+
+            const texture = new THREE.CanvasTexture(canvas);
+            const msgMesh = new THREE.Mesh(
+                new THREE.PlaneGeometry(0.4, 0.1).rotateX(-Math.PI / 2),
+                new THREE.MeshBasicMaterial({ map: texture, transparent: true })
+            );
+            
+            // پخش پیام‌ها در محدوده ۱ متری
+            msgMesh.position.set(data.x || 0, 0.01, data.z || 0);
+            anchor.add(msgMesh);
+        });
+    });
+}
+
+document.getElementById('send').onclick = async () => {
+    const input = document.getElementById('msg');
+    const text = input.value.trim();
+    if (!text || !placed) return;
+
+    input.value = "";
+    await db.collection('messages').add({
+        text: text,
+        x: (Math.random() - 0.5) * 0.8,
+        z: (Math.random() - 0.5) * 0.8,
+        createdAt: firebase.firestore.FieldValue.serverTimestamp()
+    });
+};
+
+document.getElementById('enter').onclick = startAR;
+</script>
+</body>
 </html>
