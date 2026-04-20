@@ -1,0 +1,128 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Hidden Memories AR</title>
+    
+    <script src="https://aframe.io/releases/1.2.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.1.4/dist/mindar-image-aframe.prod.js"></script>
+
+    <style>
+        /* ظاهر بخش ورودی متن */
+        #ui-layer {
+            position: fixed;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            z-index: 1000;
+            display: none;
+            background: rgba(0, 0, 0, 0.8);
+            padding: 15px;
+            border-radius: 12px;
+            width: 85%;
+            max-width: 400px;
+            text-align: center;
+        }
+        input {
+            width: 70%;
+            padding: 12px;
+            border: none;
+            border-radius: 8px;
+            font-size: 16px;
+        }
+        button {
+            padding: 12px 20px;
+            background: #4CAF50;
+            color: white;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="ui-layer">
+        <input type="text" id="userMsg" placeholder="Share a memory...">
+        <button id="sendBtn">Add</button>
+    </div>
+
+    <a-scene mindar-image="imageTargetSrc: ./targets.mind; uiScanning: yes;" 
+             vr-mode-ui="enabled: false" 
+             device-orientation-permission-ui="enabled: false">
+        
+        <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
+
+        <a-entity id="memory-anchor" mindar-image-target="targetIndex: 0">
+            </a-entity>
+    </a-scene>
+
+    <script type="module">
+        // استفاده از آخرین نسخه پایدار Firebase
+        import { initializeApp } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-app.js";
+        import { getDatabase, ref, push, onChildAdded, serverTimestamp, query, orderByChild } from "https://www.gstatic.com/firebasejs/10.7.1/firebase-database.js";
+
+        const firebaseConfig = {
+            apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
+            authDomain: "hidden-memories-27f1a.firebaseapp.com",
+            projectId: "hidden-memories-27f1a",
+            databaseURL: "https://hidden-memories-27f1a-default-rtdb.europe-west1.firebasedatabase.app/",
+            storageBucket: "hidden-memories-27f1a.firebasestorage.app",
+            messagingSenderId: "61920134607",
+            appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
+        };
+
+        const app = initializeApp(firebaseConfig);
+        const db = getDatabase(app);
+        const memoriesRef = ref(db, 'memories');
+
+        const anchor = document.querySelector('#memory-anchor');
+        const uiLayer = document.querySelector('#ui-layer');
+        let memoryCount = 0;
+
+        // نمایش ورودی متن فقط وقتی تصویر اسکن شد
+        anchor.addEventListener("targetFound", () => {
+            uiLayer.style.display = "block";
+        });
+        anchor.addEventListener("targetLost", () => {
+            uiLayer.style.display = "none";
+        });
+
+        // ثبت متن در فایربیس
+        document.querySelector('#sendBtn').addEventListener('click', () => {
+            const msgInput = document.querySelector('#userMsg');
+            const val = msgInput.value.trim();
+            if (val) {
+                push(memoriesRef, {
+                    text: val,
+                    createdAt: serverTimestamp()
+                });
+                msgInput.value = "";
+            }
+        });
+
+        // دریافت آنلاین خاطرات و نمایش در فضا
+        const q = query(memoriesRef, orderByChild('createdAt'));
+        onChildAdded(q, (snapshot) => {
+            const data = snapshot.val();
+            renderNewText(data.text);
+        });
+
+        function renderNewText(content) {
+            const el = document.createElement('a-text');
+            // محاسبه فاصله عمودی تا متن‌ها روی هم نیفتند
+            const yPos = 0.6 - (memoryCount * 0.25); 
+            
+            el.setAttribute('value', content);
+            el.setAttribute('align', 'center');
+            el.setAttribute('position', `0 ${yPos} 0.1`);
+            el.setAttribute('width', '3');
+            el.setAttribute('color', '#FFFFFF');
+            
+            anchor.appendChild(el);
+            memoryCount++;
+        }
+    </script>
+</body>
+</html>
