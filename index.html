@@ -1,164 +1,91 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-<meta charset="UTF-8" />
-<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<html>
+  <head>
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <script src="https://aframe.io/releases/1.5.0/aframe.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
+    <script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
 
-<title>Hidden Memories</title>
+    <style>
+      /* ظاهر بخش تایپ متن */
+      #ui-layer {
+        position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+        z-index: 1000; display: none; background: rgba(0,0,0,0.8);
+        padding: 10px; border-radius: 10px; width: 80%; text-align: center;
+      }
+      input { padding: 10px; width: 60%; border-radius: 5px; border: none; outline: none; }
+      button { padding: 10px; background: #2196F3; color: white; border: none; border-radius: 5px; cursor: pointer; }
+    </style>
+  </head>
+  <body>
 
-<!-- A-Frame -->
-<script src="https://aframe.io/releases/1.6.0/aframe.min.js"></script>
+    <div id="ui-layer">
+      <input type="text" id="userMsg" placeholder="Share a memory...">
+      <button id="sendBtn">Add</button>
+    </div>
 
-<!-- MindAR -->
-<script src="https://cdn.jsdelivr.net/npm/mind-ar@1.2.5/dist/mindar-image-aframe.prod.js"></script>
+    <a-scene mindar-image="imageTargetSrc: ./assets/targets.mind" color-space="sRGB" renderer="colorManagement: true, physicallyCorrectLights" vr-mode-ui="enabled: false" device-orientation-permission-ui="enabled: false">
+      <a-assets>
+        <img id="panir" src="./assets/52.png" />
+      </a-assets>
 
-<style>
-html, body {
-  margin: 0;
-  padding: 0;
-  overflow: hidden;
-  font-family: Arial, sans-serif;
-}
+      <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
 
-#ui-layer {
-  position: fixed;
-  bottom: 20px;
-  left: 50%;
-  transform: translateX(-50%);
-  z-index: 9999;
-  display: none;
-  background: rgba(0,0,0,0.8);
-  padding: 15px;
-  border-radius: 12px;
-  width: 90%;
-  max-width: 420px;
-  box-sizing: border-box;
-}
+      <a-entity id="main-anchor" mindar-image-target="targetIndex: 0">
+        <a-plane src="#panir" position="0 0 0" height="0.552" width="1" rotation="0 0 0" transparent="true"></a-plane>
+        
+        <a-entity id="memory-container"></a-entity>
+      </a-entity>
+    </a-scene>
 
-#userMsg {
-  width: 68%;
-  padding: 10px;
-  border: none;
-  border-radius: 6px;
-  outline: none;
-}
+    <script>
+      // کانفیگ فایربیس تو
+      const firebaseConfig = {
+        apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
+        authDomain: "hidden-memories-27f1a.firebaseapp.com",
+        projectId: "hidden-memories-27f1a",
+        databaseURL: "https://hidden-memories-27f1a-default-rtdb.europe-west1.firebasedatabase.app/",
+        storageBucket: "hidden-memories-27f1a.firebasestorage.app",
+        messagingSenderId: "61920134607",
+        appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
+      };
 
-#sendBtn {
-  width: 28%;
-  padding: 10px;
-  border: none;
-  border-radius: 6px;
-  background: #2196F3;
-  color: white;
-  cursor: pointer;
-}
-</style>
-</head>
+      firebase.initializeApp(firebaseConfig);
+      const db = firebase.database();
+      const memoriesRef = db.ref('memories');
 
-<body>
+      const anchor = document.querySelector('#main-anchor');
+      const container = document.querySelector('#memory-container');
+      const uiLayer = document.querySelector('#ui-layer');
+      let count = 0;
 
-<div id="ui-layer">
-  <input type="text" id="userMsg" placeholder="Memory..." />
-  <button id="sendBtn">Add</button>
-</div>
+      // نمایش کیبورد و اینپوت فقط وقتی تصویر اسکن شد
+      anchor.addEventListener("targetFound", () => { uiLayer.style.display = "block"; });
+      anchor.addEventListener("targetLost", () => { uiLayer.style.display = "none"; });
 
-<a-scene
-  mindar-image="imageTargetSrc: ./targets.mind; autoStart: true; uiLoading: yes; uiScanning: yes;"
-  color-space="sRGB"
-  renderer="colorManagement: true; physicallyCorrectLights"
-  vr-mode-ui="enabled: false"
-  device-orientation-permission-ui="enabled: false"
->
+      // فرستادن متن به فایربیس
+      document.querySelector('#sendBtn').addEventListener('click', () => {
+        const input = document.querySelector('#userMsg');
+        if (input.value.trim()) {
+          memoriesRef.push({ text: input.value, timestamp: Date.now() });
+          input.value = "";
+        }
+      });
 
-  <a-camera position="0 0 0" look-controls="enabled: false"></a-camera>
-
-  <a-entity id="memory-anchor" mindar-image-target="targetIndex: 0">
-
-    <!-- تست -->
-    <a-box color="red" position="0 0 0" scale="0.1 0.1 0.1"></a-box>
-
-  </a-entity>
-
-</a-scene>
-
-<!-- Firebase v8 -->
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-app.js"></script>
-<script src="https://www.gstatic.com/firebasejs/8.10.0/firebase-database.js"></script>
-
-<script>
-const firebaseConfig = {
-  apiKey: "AIzaSyB_b5em8duOmdyNF006-BR1rSCIGNriCtk",
-  authDomain: "hidden-memories-27f1a.firebaseapp.com",
-  projectId: "hidden-memories-27f1a",
-  databaseURL: "https://hidden-memories-27f1a-default-rtdb.europe-west1.firebasedatabase.app/",
-  storageBucket: "hidden-memories-27f1a.firebasestorage.app",
-  messagingSenderId: "61920134607",
-  appId: "1:61920134607:web:e62e0b4b3f947985b6beba"
-};
-
-firebase.initializeApp(firebaseConfig);
-
-const db = firebase.database();
-const memoriesRef = db.ref("memories");
-
-const anchor = document.querySelector("#memory-anchor");
-const uiLayer = document.querySelector("#ui-layer");
-const input = document.querySelector("#userMsg");
-const sendBtn = document.querySelector("#sendBtn");
-
-let count = 0;
-
-/* وقتی تارگت پیدا شد */
-anchor.addEventListener("targetFound", () => {
-  uiLayer.style.display = "block";
-});
-
-/* وقتی تارگت گم شد */
-anchor.addEventListener("targetLost", () => {
-  uiLayer.style.display = "none";
-});
-
-/* ارسال متن */
-sendBtn.addEventListener("click", () => {
-  const text = input.value.trim();
-
-  if (!text) return;
-
-  memoriesRef.push({
-    text: text,
-    time: Date.now()
-  });
-
-  input.value = "";
-});
-
-/* اینتر */
-input.addEventListener("keypress", (e) => {
-  if (e.key === "Enter") sendBtn.click();
-});
-
-/* نمایش متن‌ها */
-memoriesRef.on("child_added", (snapshot) => {
-  const data = snapshot.val();
-
-  const textEl = document.createElement("a-text");
-
-  textEl.setAttribute("value", data.text);
-  textEl.setAttribute("align", "center");
-  textEl.setAttribute("color", "#FFFFFF");
-  textEl.setAttribute("width", "2.5");
-  textEl.setAttribute("wrap-count", "24");
-
-  textEl.setAttribute(
-    "position",
-    `0 ${0.5 - (count * 0.2)} 0.1`
-  );
-
-  anchor.appendChild(textEl);
-
-  count++;
-});
-</script>
-
-</body>
+      // گرفتن متن‌ها از فایربیس و نمایش در AR
+      memoriesRef.on('child_added', (snapshot) => {
+        const data = snapshot.val();
+        const textEl = document.createElement('a-text');
+        textEl.setAttribute('value', data.text);
+        // متن‌ها را با فاصله عمودی از هم بالای تصویر پنیر می‌چینیم
+        textEl.setAttribute('position', `0 ${0.4 + (count * 0.15)} 0.01`);
+        textEl.setAttribute('align', 'center');
+        textEl.setAttribute('width', '2');
+        textEl.setAttribute('color', '#FFFFFF');
+        container.appendChild(textEl);
+        count++;
+      });
+    </script>
+  </body>
 </html>
